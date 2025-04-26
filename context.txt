@@ -1,0 +1,351 @@
+// BACKEND SERVICES
+
+# ====== backend/services/zillow_service.py ======
+# backend/services/zillow_service.py
+import os
+import requests
+
+ZILLOW_API_KEY = os.getenv("ZILLOW_API_KEY")
+
+def get_property_info(address: str):
+    """Get basic property info from Zillow API."""
+    url = "https://zillow-com1.p.rapidapi.com/resolveAddressToZpid"
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "x-rapidapi-host": "zillow-com1.p.rapidapi.com",
+        "x-rapidapi-key": ZILLOW_API_KEY,
+    }
+    payload = {"address": address}
+
+    response = requests.post(url, data=payload, headers=headers)
+    response.raise_for_status()
+
+    data = response.json()
+    return {
+        "zpid": data.get("zpid"),
+        "price": data.get("price"),
+        "address": data.get("address"),
+    }
+
+
+# ====== backend/services/rentcast_service.py ======
+# services/rentcast_service.py
+
+import os
+import requests
+
+RENTCAST_API_KEY = os.getenv("RENTCAST_API_KEY")
+RENTCAST_BASE_URL = "https://api.rentcast.io/v1"
+
+def get_property_info(address=None, city=None, state=None, zip_code=None):
+    url = f"{RENTCAST_BASE_URL}/properties"
+    headers = {
+        "X-Api-Key": RENTCAST_API_KEY,
+        "Accept": "application/json"
+    }
+    params = {}
+    if address:
+        params["address"] = address
+    if city:
+        params["city"] = city
+    if state:
+        params["state"] = state
+    if zip_code:
+        params["zipCode"] = zip_code
+
+    response = requests.get(url, headers=headers, params=params)
+    response.raise_for_status()
+    return response.json()
+
+
+// FRONTEND COMPONENTS
+
+// ====== frontend/src/components/valuehistorychart.tsx ======
+// frontend/src/components/valuehistorychart.tsx
+"use client";
+
+import ReactECharts from 'echarts-for-react';
+import * as echarts from 'echarts/core';
+import { LineChart } from 'echarts/charts';
+import {
+  GridComponent,
+  TooltipComponent,
+  TitleComponent,
+  DataZoomComponent,
+  LegendComponent,
+} from 'echarts/components';
+import { CanvasRenderer } from 'echarts/renderers';
+import { HistoricalValue } from '@/types';
+import { useTheme } from 'next-themes';
+
+echarts.use([
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  LineChart,
+  CanvasRenderer,
+  DataZoomComponent,
+  LegendComponent,
+]);
+
+interface ValueHistoryChartProps {
+  data: HistoricalValue[];
+  className?: string;
+}
+
+const formatCurrencyAxis = (value: number): string => {
+  if (value >= 1_000_000) {
+    return `$${(value / 1_000_000).toFixed(1)}M`;
+  }
+  if (value >= 1_000) {
+    return `$${(value / 1_000).toFixed(0)}k`;
+  }
+  return `$${value}`;
+};
+
+export default function ValueHistoryChart({ data, className }: ValueHistoryChartProps) {
+  const { resolvedTheme } = useTheme();
+  const isDarkMode = resolvedTheme === 'dark';
+
+  const chartData = data.map(item => [item.date, item.value]);
+
+  const option = {
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        type: 'cross',
+        label: { backgroundColor: '#6a7985' }
+      },
+      valueFormatter: (value: number | string) => formatCurrencyAxis(Number(value)),
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '10%',
+      containLabel: true,
+    },
+    xAxis: {
+      type: 'time',
+      boundaryGap: false,
+      axisLabel: { color: isDarkMode ? '#ccc' : '#333', hideOverlap: true },
+      axisLine: { lineStyle: { color: isDarkMode ? '#555' : '#ccc' } }
+    },
+    yAxis: {
+      type: 'value',
+      name: 'Estimated Value',
+      nameTextStyle: { color: isDarkMode ? '#ccc' : '#333', align: 'left' },
+      axisLabel: {
+        formatter: (value: number) => formatCurrencyAxis(value),
+        color: isDarkMode ? '#ccc' : '#333',
+      },
+      splitLine: { lineStyle: { color: isDarkMode ? '#333' : '#eee', type: 'dashed' } }
+    },
+    dataZoom: [
+      { type: 'inside', start: 0, end: 100, filterMode: 'filter' },
+      {
+        type: 'slider',
+        start: 0,
+        end: 100,
+        height: 20,
+        bottom: 10,
+        borderColor: isDarkMode ? '#555' : '#ddd',
+        handleStyle: { color: '#4e8af9' },
+        dataBackground: {
+          lineStyle: { color: isDarkMode ? '#555' : '#ddd' },
+          areaStyle: { color: 'rgba(78, 138, 249, 0.3)' }
+        },
+        textStyle: { color: isDarkMode ? '#ccc' : '#333' }
+      }
+    ],
+    series: [{
+      name: 'Estimated Value',
+      type: 'line',
+      smooth: true,
+      symbol: 'none',
+      sampling: 'lttb',
+      data: chartData,
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(78, 138, 249, 0.5)' },
+          { offset: 1, color: 'rgba(78, 138, 249, 0.1)' }
+        ])
+      },
+      lineStyle: { width: 2, color: '#4e8af9' },
+      itemStyle: { color: '#4e8af9' }
+    }],
+    backgroundColor: 'transparent',
+  };
+
+  return (
+    <div className={className}>
+      <ReactECharts
+        echarts={echarts}
+        option={option}
+        notMerge={true}
+        lazyUpdate={true}
+        style={{ height: '350px', width: '100%' }}
+        theme={isDarkMode ? "dark" : "light"}
+      />
+    </div>
+  );
+}
+
+
+// ====== frontend/src/types/index.ts ======
+// frontend/src/types/index.ts
+export interface HistoricalValue {
+    date: string;
+    value: number;
+}
+
+export interface PropertyData {
+    id: string;
+    address: string;
+    formattedAddress: string;
+    latitude: number;
+    longitude: number;
+    bedrooms?: number;
+    bathrooms?: number;
+    squareFootage?: number;
+    lotSize?: number;
+    yearBuilt?: number;
+    propertyType?: string;
+    description?: string;
+    valueEstimate?: number;
+    valueEstimateLow?: number;
+    valueEstimateHigh?: number;
+    rentEstimate?: number;
+    rentEstimateLow?: number;
+    rentEstimateHigh?: number;
+    lastSoldDate?: string;
+    lastSoldPrice?: number;
+    predictedValueNextYear?: number;
+    predictionConfidence?: number;
+    predictedRentNextYear?: number;
+    marketTrend?: 'Increasing' | 'Decreasing' | 'Stable';
+    trendConfidence?: number;
+    historicalValues?: HistoricalValue[];
+}
+
+export interface ApiErrorResponse {
+    message: string;
+}
+
+
+// ====== frontend/src/app/page.tsx ======
+// frontend/src/app/page.tsx
+"use client";
+
+import { useState } from "react";
+import axios, { AxiosError } from 'axios';
+import SearchBar from "@/components/searchbar";
+import InsightsDashboard from "@/components/insightsdashboard";
+import { PropertyData, ApiErrorResponse } from "@/types";
+
+const HomePage = () => {
+  const [propertyData, setPropertyData] = useState<PropertyData | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSearchSubmit = async (address: string) => {
+    setIsLoading(true);
+    setError(null);
+    setPropertyData(null);
+
+    try {
+      const response = await axios.get<PropertyData>(`/api/property`, {
+        params: { address },
+      });
+
+      if (response.data) {
+        setPropertyData(response.data);
+      } else {
+         throw new Error("Received empty data from server.");
+      }
+    } catch (err: unknown) {
+      let errorMessage = "An unexpected error occurred.";
+      if (axios.isAxiosError(err)) {
+        const axiosError = err as AxiosError<ApiErrorResponse>;
+        errorMessage = axiosError.response?.data?.message || axiosError.message;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center min-h-screen py-10 px-4 bg-gradient-to-b from-sky-50 to-gray-100">
+      <div className="text-center mb-8">
+         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-800">
+           ShelterSignal
+         </h1>
+         <p className="text-lg text-gray-600 mt-2">
+           Get Instant Property Insights & Future Price Predictions
+         </p>
+      </div>
+
+      <SearchBar onSubmit={handleSearchSubmit} isLoading={isLoading} className="mb-6" />
+
+      {error && !isLoading && (
+         <Alert variant="destructive" className="w-full max-w-4xl mt-4">
+           <Terminal className="h-4 w-4" />
+           <AlertTitle>Search Failed</AlertTitle>
+           <AlertDescription>{error}</AlertDescription>
+         </Alert>
+      )}
+
+      <InsightsDashboard data={propertyData} isLoading={isLoading} />
+    </div>
+  );
+};
+
+export default HomePage;
+
+
+// ====== frontend/pages/api/property.ts ======
+// frontend/pages/api/property.ts
+import type { NextApiRequest, NextApiResponse } from 'next';
+import axios, { AxiosError } from 'axios';
+import type { PropertyData, ApiErrorResponse } from '@/types';
+
+const BACKEND_API_URL = process.env.BACKEND_API_URL || 'http://localhost:8001/property';
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<PropertyData | ApiErrorResponse>
+) {
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', ['GET']);
+    return res.status(405).json({ message: `Method ${req.method} Not Allowed` });
+  }
+
+  const { address } = req.query;
+
+  if (!address || typeof address !== 'string' || address.trim() === '') {
+    return res.status(400).json({ message: 'Address query parameter is required.' });
+  }
+
+  try {
+    const backendResponse = await axios.get<PropertyData>(BACKEND_API_URL, {
+      params: { address: address.trim() },
+      timeout: 15000,
+    });
+
+    if (backendResponse.status === 200 && backendResponse.data) {
+       return res.status(200).json(backendResponse.data);
+    } else {
+       return res.status(500).json({ message: 'Invalid backend response.' });
+    }
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<ApiErrorResponse>;
+      const backendMessage = axiosError.response?.data?.message;
+      const status = axiosError.response?.status || 500;
+      return res.status(status).json({ message: backendMessage || 'Backend service error.' });
+    }
+    return res.status(500).json({ message: 'Unexpected error occurred.' });
+  }
+}

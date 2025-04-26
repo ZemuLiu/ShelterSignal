@@ -34,7 +34,6 @@ export default function PredictionChart({ data, historicalData, className }: Pre
   const isDarkMode = resolvedTheme === 'dark';
 
   // Prepare data for ECharts series
-  const predictionChartData = data.map(item => [item.date, item.value]);
   // Include the last historical point if provided, to connect the lines
   const combinedData = historicalData && historicalData.length > 0
       ? [historicalData[historicalData.length - 1], ...data] // Combine last historical + predictions

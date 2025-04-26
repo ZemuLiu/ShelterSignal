@@ -9,8 +9,8 @@ import { PropertyData, ApiErrorResponse } from "@/types"; // Import custom types
 
 // Import shadcn components for UI feedback
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-// Import icons from lucide-react
-import { Terminal, AlertCircle, Search } from "lucide-react";
+// Import icons from lucide-react (Removed unused Search icon)
+import { Terminal, AlertCircle } from "lucide-react";
 
 const HomePage = () => {
   // State for the fetched property data

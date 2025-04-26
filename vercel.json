@@ -4,19 +4,35 @@
     "builds": [
       {
         "src": "backend/main.py",
-        "use": "@vercel/python",
-        "config": { "maxLambdaSize": "15mb", "runtime": "python3.9" }
+        "use": "@vercel/python"
       },
       {
         "src": "frontend/package.json",
-        "use": "@vercel/next",
-        "config": { "maxLambdaSize": "15mb" }
+        "use": "@vercel/next"
       }
     ],
     "routes": [
+
       {
         "src": "/api/(.*)",
         "dest": "backend/main.py"
+      },
+
+      {
+        "src": "/_next/.*",
+        "handle": "filesystem"
+      },
+      {
+        "src": "/static/.*",
+        "handle": "filesystem"
+      },
+      {
+        "src": "/favicon.ico",
+        "handle": "filesystem"
+      },
+      {
+        "src": "/(.*)",
+        "dest": "/frontend" 
       }
     ]
   }
